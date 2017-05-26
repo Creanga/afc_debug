@@ -17,8 +17,8 @@ function GetBacktrace($depth)
     $i = 0;
     foreach ($trace_array as $rec) {
         $s = '';
-        $line = ($rec['line'] ?? 'unknown');
-        $file = (isset ($rec['file']) ? $rec['file']: 'unknown');
+        $line = ($rec['line'] ?? '??');
+        $file = (isset ($rec['file']) ? $rec['file']: 'Internal function');
         $s .= sprintf('%s(%d)', $file, $line);
 
         // Line with "debug" function (first line)
@@ -35,12 +35,13 @@ function GetBacktrace($depth)
         $args = null; // Array of function parameters
         foreach ($rec['args'] as $arg)
             switch (gettype($arg)) {
-                case 'object':
                 case 'string':
                     parse_array_item($arg);
                     $args[] = $arg;
                     break;
+                case 'object':
                 case 'array':
+                    $arg = debug_delete_array_level($arg);
                     array_walk_recursive($arg, 'parse_array_item');
                     $args[] = $arg;
                     break;
@@ -102,7 +103,10 @@ function debug(array $params = null, $depth = 3)
     }
 
     foreach ($params as $key => $value) {
-        echo PHP_EOL, ", '\\n  $key: ', ", ($v1 = json_encode($value)) ? $v1 : "'error encoding!'";
+        $s = PHP_EOL . ", '\\n  $key: ', ";
+        $s .= ($v1 = json_encode(debug_delete_array_level($value))) ? $v1 : "'error json encoding!'";
+// debug_save_string($s);
+        echo $s;
     }
 
     echo ");", PHP_EOL;
@@ -143,10 +147,11 @@ function debug_stop($params = null, $print_to_screen = true, $stop_condition = t
                 // Print only breakpoint line
                 echo "<br /># ", htmlspecialchars($v);
         }
-        echo "<br /><br />Breakpoint parameter is: ", htmlspecialchars(print_r($params, true)), "<br />";
+        if (isset($params));
+            echo "<br /><br />Breakpoint parameter is: ", htmlspecialchars(print_r(debug_delete_array_level($params), true));
     }
     if ($stop_condition)
-        die("<br />Programm stopped at $v!");
+        die("<br /><br />Programm stopped at $v");
 }
 
 //
@@ -176,7 +181,7 @@ function parse_array_item(&$item, $key = null)
 // If necessary cut off the right or left side of the line
 function triming_string(string $string, $left=false)
 {
-    $MAXSTRLEN = 79;
+    $MAXSTRLEN = 127;
     if (mb_strlen($string) > $MAXSTRLEN)
         if ($left)
             return "..." . substr($string, 3 - $MAXSTRLEN);
@@ -191,6 +196,7 @@ function debug_save_string($string, $file = 'afc_debug.txt')
 {
     file_put_contents($file, $string . "\n", FILE_APPEND | LOCK_EX);
 }
+
 // Copy the array to text file
 function debug_save_array(array &$a, $level = 0, $file = 'afc_debug.txt')
 {
@@ -209,6 +215,39 @@ function debug_save_array(array &$a, $level = 0, $file = 'afc_debug.txt')
                 file_put_contents($file, str_repeat("  ", $level) . "$key=>$value\n", FILE_APPEND | LOCK_EX);
                 break;
         }
+    }
+}
+// Deletes elements in an array below a specified depth
+function debug_delete_array_level($set, $depth = 2)
+{
+    $t = gettype($set);
+    if ($t == 'object' || $t == 'array') {
+        $ret = [];
+        if ($depth > 0) {
+            foreach ($set as $key => $value) {
+                $ret[$key] = debug_delete_array_level($value, $depth - 1);
+            }
+        } else {
+            foreach ($set as $key => $value) {
+                switch (gettype($value)) {
+                    case 'array':
+                        $ret[$key] = 'Array(' . count($value) . ')';
+                        break;
+                    case 'object':
+                        $ret[$key] = 'Object(' . get_class($value) . ')';
+                        break;
+                    default:
+                        $ret[$key] = $value;
+                        break;
+                }
+            }
+        }
+        if ($t == 'object')
+            return (object) $ret;
+        else
+            return $ret;
+    } else {
+        return $set;
     }
 }
 ?>
