@@ -1,11 +1,11 @@
-<?php // v1.04 2017-04-13
+<?php // v1.05 2017-05-19
 
 function GetBacktrace($depth)
 {
 // debug_save_string("\n----------------");
     $trace_array = debug_backtrace();
 // debug_save_array($trace_array);
-    while (in_array($trace_array[1]['function'] ?? '', ['debug', 'debug_stop']))
+    while (in_array($trace_array[1]['function'] ?? '', ['debug', 'debug_stop', 'debug_console']))
         array_shift($trace_array);
     if ($depth > 0) {
         $pops = count($trace_array) - $depth;
@@ -115,6 +115,36 @@ function debug(array $params = null, $depth = 3)
 // debug_save_string(ob_get_contents());
     echo ob_get_clean();
     return $a;
+}
+
+function debug_console(array $params = null, $depth = 0)
+{
+    ob_start();
+    $a = array_reverse(GetBacktrace($depth));
+    foreach ($a as $v) {
+        // if $v (argument) is array, then print $v[0], else print $v
+        if (is_array($v)) {
+            // Print breakpoint line with function arguments
+            echo "\n\r# ", $v[0];
+            // if (isset($v[1])) {
+            //     // There is no need to print ","
+            //     // at the beginning of the first argument
+            //     $i = 0;
+            //     foreach ($v[1] as $arg) {
+            //         if ($i++ > 0)
+            //             echo ", ";
+            //         echo print_r($arg, true);
+            //     }
+            // }
+            if (substr($v[0], -1) == "(")
+                // The end of breakpoint line is "function ("
+                echo ")";
+        } else
+            // Print only breakpoint line
+            echo "\n\r# ", $v;
+    }
+    echo ob_get_clean();
+    die("\n\r\n\rProgramm stopped at $v");
 }
 
 function debug_stop($params = null, $print_to_screen = true, $stop_condition = true, $only_on_stop = true)
