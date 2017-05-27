@@ -1,4 +1,4 @@
-<?php // v1.05 2017-05-19
+<?php // v1.06 2017-05-22
 
 function GetBacktrace($depth)
 {
@@ -33,7 +33,8 @@ function GetBacktrace($depth)
 
         $s .= $rec['function'] . "(";
         $args = null; // Array of function parameters
-        foreach ($rec['args'] as $arg)
+        foreach ($rec['args'] as $arg) {
+            $arg = debug_delete_array_level($arg, 2);
             switch (gettype($arg)) {
                 case 'string':
                     parse_array_item($arg);
@@ -41,7 +42,6 @@ function GetBacktrace($depth)
                     break;
                 case 'object':
                 case 'array':
-                    $arg = debug_delete_array_level($arg);
                     array_walk_recursive($arg, 'parse_array_item');
                     $args[] = $arg;
                     break;
@@ -49,8 +49,7 @@ function GetBacktrace($depth)
                     $args[] = $arg ?? 'NULL';
                     break;
             }
-        // $s = triming_string($s, true);
-
+        }
 // debug_save_string($s);
         $a[] = [triming_string($s, true), $args];
     }
@@ -104,7 +103,7 @@ function debug(array $params = null, $depth = 3)
 
     foreach ($params as $key => $value) {
         $s = PHP_EOL . ", '\\n  $key: ', ";
-        $s .= ($v1 = json_encode(debug_delete_array_level($value))) ? $v1 : "'error json encoding!'";
+        $s .= ($v1 = json_encode(debug_delete_array_level($value, 2))) ? $v1 : "'error json encoding!'";
 // debug_save_string($s);
         echo $s;
     }
@@ -126,16 +125,6 @@ function debug_console(array $params = null, $depth = 0)
         if (is_array($v)) {
             // Print breakpoint line with function arguments
             echo "\n\r# ", $v[0];
-            // if (isset($v[1])) {
-            //     // There is no need to print ","
-            //     // at the beginning of the first argument
-            //     $i = 0;
-            //     foreach ($v[1] as $arg) {
-            //         if ($i++ > 0)
-            //             echo ", ";
-            //         echo print_r($arg, true);
-            //     }
-            // }
             if (substr($v[0], -1) == "(")
                 // The end of breakpoint line is "function ("
                 echo ")";
@@ -177,14 +166,13 @@ function debug_stop($params = null, $print_to_screen = true, $stop_condition = t
                 // Print only breakpoint line
                 echo "<br /># ", htmlspecialchars($v);
         }
-        if (isset($params));
-            echo "<br /><br />Breakpoint parameter is: ", htmlspecialchars(print_r(debug_delete_array_level($params), true));
+        if (isset($params))
+            echo "<br /><br />Breakpoint parameter is: ", print_r(debug_delete_array_level($params, 2), true);
     }
     if ($stop_condition)
         die("<br /><br />Programm stopped at $v");
 }
 
-//
 function jshtml_chars(string $value='')
 {
     return str_replace(
@@ -239,7 +227,7 @@ function debug_save_array(array &$a, $level = 0, $file = 'afc_debug.txt')
                 break;
             case 'array':
                 file_put_contents($file, str_repeat("  ", $level) . "$key=>\n", FILE_APPEND | LOCK_EX);
-                debug_save_array($value, $level + 1);
+// debug_save_array($value, $level + 1);
                 break;
             default:
                 file_put_contents($file, str_repeat("  ", $level) . "$key=>$value\n", FILE_APPEND | LOCK_EX);
@@ -247,37 +235,30 @@ function debug_save_array(array &$a, $level = 0, $file = 'afc_debug.txt')
         }
     }
 }
-// Deletes elements in an array below a specified depth
-function debug_delete_array_level($set, $depth = 2)
+// Deletes elements in an array or object below a specified depth
+function debug_delete_array_level($set, $depth)
 {
-    $t = gettype($set);
-    if ($t == 'object' || $t == 'array') {
-        $ret = [];
-        if ($depth > 0) {
-            foreach ($set as $key => $value) {
-                $ret[$key] = debug_delete_array_level($value, $depth - 1);
-            }
-        } else {
-            foreach ($set as $key => $value) {
-                switch (gettype($value)) {
-                    case 'array':
-                        $ret[$key] = 'Array(' . count($value) . ')';
-                        break;
-                    case 'object':
-                        $ret[$key] = 'Object(' . get_class($value) . ')';
-                        break;
-                    default:
-                        $ret[$key] = $value;
-                        break;
-                }
-            }
-        }
-        if ($t == 'object')
-            return (object) $ret;
-        else
-            return $ret;
-    } else {
-        return $set;
+    switch (gettype($set)) {
+        case 'object':
+            if ($depth > 0) {
+                $ret = [];
+                foreach ($set as $key => $value)
+                    $ret[$key] = debug_delete_array_level($value, $depth - 1);
+                return (object) $ret;
+            } else
+                return get_class($set) . ' Object(' . count($set) . ')';
+        case 'array':
+            if ($depth > 0) {
+                $ret = [];
+                foreach ($set as $key => $value)
+                    $ret[$key] = debug_delete_array_level($value, $depth - 1);
+                return $ret;
+            } else
+                return 'Array(' . count($set) . ')';
+        // case 'string':
+        //     return '"' . $set . '"';
+        default:
+            return $set;
     }
 }
 ?>
