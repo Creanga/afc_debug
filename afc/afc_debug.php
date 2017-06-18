@@ -1,4 +1,4 @@
-<?php // v1.06 2017-05-22
+<?php // v1.07 2017-05-22
 
 function GetBacktrace($depth)
 {
@@ -103,7 +103,8 @@ function debug(array $params = null, $depth = 3)
 
     foreach ($params as $key => $value) {
         $s = PHP_EOL . ", '\\n  $key: ', ";
-        $s .= ($v1 = json_encode(debug_delete_array_level($value, 2))) ? $v1 : "'error json encoding!'";
+        // $s .= ($v1 = json_encode(debug_delete_array_level($value, 2))) ? $v1 : "'error json encoding!'"; // deleted in v1.07
+        $s .= json_encode(debug_delete_array_level($value, 2)); // v1.07
 // debug_save_string($s);
         echo $s;
     }
